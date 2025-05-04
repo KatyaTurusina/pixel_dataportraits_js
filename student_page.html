@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Page - Answer Questions</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fb;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .questions {
+            flex: 1;
+        }
+
+        .question {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .answers {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button.selected {
+            background-color: #2a70c2;
+        }
+
+        .visualization {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        #downloadBtn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Ответьте на вопросы</h1>
+    <div class="container">
+        <div class="questions" id="questionContainer"></div>
+        <div class="visualization">
+            <canvas id="pixelCanvas"></canvas>
+            <button id="downloadBtn">Скачать изображение</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d');
+        const questionContainer = document.getElementById('questionContainer');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let questionsData = JSON.parse(localStorage.getItem('questionsForStudents')) || [];
+        let basePixelMatrix = [];
+        let activeShapeMatrices = [];
+
+        init();
+
+        async function init() {
+            await loadBasePixelMatrix();
+            renderQuestions();
+            setupEventListeners();
+        }
+
+        async function loadBasePixelMatrix() {
+            try {
+                const response = await fetch('pixel_matrix.json');
+                basePixelMatrix = await response.json();
+                console.log('Базовая матрица загружена:', basePixelMatrix);
+
+                const pixelSize = 10;
+                canvas.width = basePixelMatrix[0].length * pixelSize;
+                canvas.height = basePixelMatrix.length * pixelSize;
+
+                drawPixelArt();
+            } catch (error) {
+                console.error('Ошибка загрузки базовой матрицы:', error);
+            }
+        }
+
+        async function loadShapeMatrix(url) {
+            try {
+                const response = await fetch(url);
+                const matrix = await response.json();
+                console.log('Матрица формы загружена:', url, matrix);
+                return matrix;
+            } catch (error) {
+                console.error('Ошибка загрузки матрицы формы:', error);
+                return null;
+            }
+        }
+
+        function renderQuestions() {
+            questionContainer.innerHTML = '';
+
+            questionsData.forEach((question, qIndex) => {
+                const questionEl = document.createElement('div');
+                questionEl.className = 'question';
+                questionEl.innerHTML = `
+                    <h3>${qIndex + 1}. ${question.question}</h3>
+                    <div class="answers" id="answers-${qIndex}">
+                        ${question.answers.map((answer, aIndex) => `
+                            <button data-q="${qIndex}" data-a="${aIndex}">
+                                ${answer.text}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                questionContainer.appendChild(questionEl);
+            });
+        }
+
+        function setupEventListeners() {
+            questionContainer.addEventListener('click', async (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const qIndex = parseInt(e.target.dataset.q);
+                    const aIndex = parseInt(e.target.dataset.a);
+                    const question = questionsData[qIndex];
+                    const answer = question.answers[aIndex];
+                    а
+                    const answerButtons = document.querySelectorAll(`#answers-${qIndex} button`);
+                    answerButtons.forEach(btn => btn.classList.remove('selected'));
+
+                    e.target.classList.add('selected');
+
+                    if (answer.shapeMatrix) {
+                        const shapeMatrix = await loadShapeMatrix(answer.shapeMatrix);
+                        if (shapeMatrix) {
+                            activeShapeMatrices = activeShapeMatrices.filter(m => m.qIndex !== qIndex);
+
+                            activeShapeMatrices.push({
+                                matrix: shapeMatrix,
+                                qIndex: qIndex,
+                                color: answer.color
+                            });
+                            console.log('Активные фигуры:', activeShapeMatrices);
+                        }
+                    }
+
+                    drawPixelArt();
+                }
+            });
+
+            downloadBtn.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.download = 'pixel-art.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+
+        function drawPixelArt() {
+            const pixelSize = 10;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawMatrix(basePixelMatrix, '#f6bac2');
+
+            activeShapeMatrices.forEach(item => {
+                drawMatrix(item.matrix, item.color);
+            });
+        }
+
+        function drawMatrix(matrix, color) {
+            const pixelSize = 10;
+
+            matrix.forEach((row, y) => {
+                row.forEach((code, x) => {
+                    if (code === 0) return;
+
+                    if (color !== '#f6bac2' && code !== 2) return;
+
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                });
+            });
+        }
+    </script>
+</body>
+
+</html>
